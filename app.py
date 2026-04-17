@@ -46,18 +46,18 @@ with st.sidebar:
     st.divider()
 
     SECOES = {
-        "📂 Carregar Dados":          "carregar",
-        "🧹 Limpar e Preparar":       "limpar",
-        "🔎 Explorar Dados":          "explorar",
-        "📈 Visualizar":              "visualizar",
-        "🗺️  Mapas":                 "mapas",
-        "📄 Extrair de Texto":        "texto",
-        "📅 Linha do Tempo":          "timeline",
-        "🔄 Comparador de Versões":   "comparador",
-        "⚠️  Inconsistências":        "alertas",
-        "💡 Insights de Pauta":       "insights",
-        "📋 Metodologia":             "metodologia",
-        "📓 Bloco de Notas":          "notas",
+        "📂 Carregar Dados":        "carregar",
+        "🧹 Limpar e Preparar":     "limpar",
+        "🔎 Explorar Dados":        "explorar",
+        "📈 Visualizar":            "visualizar",
+        "🗺️  Mapas":               "mapas",
+        "📄 Extrair de Texto":      "texto",
+        "📅 Linha do Tempo":        "timeline",
+        "🔄 Comparador de Versões": "comparador",
+        "⚠️  Inconsistências":      "alertas",
+        "💡 Insights de Pauta":     "insights",
+        "📋 Metodologia":           "metodologia",
+        "📓 Bloco de Notas":        "notas",
     }
 
     secao_atual = st.radio(
@@ -71,47 +71,70 @@ with st.sidebar:
     st.divider()
 
     # Status do arquivo carregado
-if nome_arq:
-    st.markdown(f"""
-    <div style="font-size:.78rem;color:#c4b49a">
-        <b style="color:#bd8e27">Arquivo ativo:</b><br>
-        {nome_arq}
-    </div>
-    """, unsafe_allow_html=True)
+    df_sessao = st.session_state.get("df_limpo", None)
+    if df_sessao is None:
+        df_sessao = st.session_state.get("df", None)
 
-    if df_sessao is not None:
-        st.markdown(f"""
-        <div style="font-size:.75rem;color:#a09890;margin-top:4px">
-        {len(df_sessao):,} linhas · {len(df_sessao.columns)} colunas
-        </div>
-        """.replace(",", "."), unsafe_allow_html=True)
+    txt_sessao = st.session_state.get("texto_carregado", None)
+    nome_arq = st.session_state.get("nome_arquivo", None)
 
-    if txt_sessao:
+    if nome_arq:
         st.markdown(f"""
-        <div style="font-size:.75rem;color:#a09890;margin-top:2px">
-        Texto: {len(txt_sessao):,} caracteres
+        <div style="font-size:.78rem;color:#c4b49a">
+            <b style="color:#bd8e27">Arquivo ativo:</b><br>
+            {nome_arq}
         </div>
-        """.replace(",", "."), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+
+        if df_sessao is not None:
+            st.markdown(f"""
+            <div style="font-size:.75rem;color:#a09890;margin-top:4px">
+            {len(df_sessao):,} linhas · {len(df_sessao.columns)} colunas
+            </div>
+            """.replace(",", "."), unsafe_allow_html=True)
+
+        if txt_sessao is not None:
+            st.markdown(f"""
+            <div style="font-size:.75rem;color:#a09890;margin-top:2px">
+            Texto: {len(txt_sessao):,} caracteres
+            </div>
+            """.replace(",", "."), unsafe_allow_html=True)
     else:
-        st.markdown('<div style="font-size:.78rem;color:#a09890">Nenhum arquivo carregado</div>',
-                    unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size:.78rem;color:#a09890">Nenhum arquivo carregado</div>',
+            unsafe_allow_html=True
+        )
 
     st.divider()
-    st.markdown('<div style="font-size:.7rem;color:#7a6e68;text-align:center">v0.1 · uso local</div>',
-                unsafe_allow_html=True)
+    st.markdown(
+        '<div style="font-size:.7rem;color:#7a6e68;text-align:center">v0.1 · uso local</div>',
+        unsafe_allow_html=True
+    )
 
 # ── Roteamento de seções ──────────────────────────────────────────────────────
 render_header(secao_atual)
 
-if   chave == "carregar":    tab_carregar.render()
-elif chave == "limpar":      tab_limpar.render()
-elif chave == "explorar":    tab_explorar.render()
-elif chave == "visualizar":  tab_visualizar.render()
-elif chave == "mapas":       tab_mapas.render()
-elif chave == "texto":       tab_texto.render()
-elif chave == "timeline":    tab_timeline.render()
-elif chave == "comparador":  tab_comparador.render()
-elif chave == "alertas":     tab_alertas.render()
-elif chave == "insights":    tab_insights.render()
-elif chave == "metodologia": tab_meta.render_metodologia()
-elif chave == "notas":       tab_meta.render_notas()
+if chave == "carregar":
+    tab_carregar.render()
+elif chave == "limpar":
+    tab_limpar.render()
+elif chave == "explorar":
+    tab_explorar.render()
+elif chave == "visualizar":
+    tab_visualizar.render()
+elif chave == "mapas":
+    tab_mapas.render()
+elif chave == "texto":
+    tab_texto.render()
+elif chave == "timeline":
+    tab_timeline.render()
+elif chave == "comparador":
+    tab_comparador.render()
+elif chave == "alertas":
+    tab_alertas.render()
+elif chave == "insights":
+    tab_insights.render()
+elif chave == "metodologia":
+    tab_meta.render_metodologia()
+elif chave == "notas":
+    tab_meta.render_notas()
