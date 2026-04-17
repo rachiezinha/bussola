@@ -1,6 +1,5 @@
 import streamlit as st
-from utils.helpers import get_historico, log_acao
-
+from helpers import get_historico, log_acao
 
 def render_metodologia():
     st.subheader("📋 Metodologia")
