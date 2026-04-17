@@ -3,7 +3,7 @@ import pandas as pd
 import re
 import io
 from collections import Counter
-from utils.helpers import extrair_padroes, log_acao, df_to_csv_bytes
+from helpers import extrair_padroes, log_acao, df_to_csv_bytes
 
 try:
     from bs4 import BeautifulSoup
