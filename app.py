@@ -71,29 +71,27 @@ with st.sidebar:
     st.divider()
 
     # Status do arquivo carregado
-    df_sessao  = st.session_state.get("df_limpo") or st.session_state.get("df")
-    txt_sessao = st.session_state.get("texto_carregado")
-    nome_arq   = st.session_state.get("nome_arquivo")
+   if nome_arq:
+    st.markdown(f"""
+    <div style="font-size:.78rem;color:#c4b49a">
+        <b style="color:#bd8e27">Arquivo ativo:</b><br>
+        {nome_arq}
+    </div>
+    """, unsafe_allow_html=True)
 
-    if nome_arq:
+    if df_sessao is not None:
         st.markdown(f"""
-        <div style="font-size:.78rem;color:#c4b49a">
-            <b style="color:#bd8e27">Arquivo ativo:</b><br>
-            {nome_arq}
+        <div style="font-size:.75rem;color:#a09890;margin-top:4px">
+        {len(df_sessao):,} linhas · {len(df_sessao.columns)} colunas
         </div>
-        """, unsafe_allow_html=True)
-        if df_sessao is not None:
-            st.markdown(f"""
-            <div style="font-size:.75rem;color:#a09890;margin-top:4px">
-                {len(df_sessao):,} linhas · {len(df_sessao.columns)} colunas
-            </div>
-            """.replace(",","."), unsafe_allow_html=True)
-        if txt_sessao:
-            st.markdown(f"""
-            <div style="font-size:.75rem;color:#a09890;margin-top:2px">
-                Texto: {len(txt_sessao):,} caracteres
-            </div>
-            """.replace(",","."), unsafe_allow_html=True)
+        """.replace(",", "."), unsafe_allow_html=True)
+
+    if txt_sessao:
+        st.markdown(f"""
+        <div style="font-size:.75rem;color:#a09890;margin-top:2px">
+        Texto: {len(txt_sessao):,} caracteres
+        </div>
+        """.replace(",", "."), unsafe_allow_html=True)
     else:
         st.markdown('<div style="font-size:.78rem;color:#a09890">Nenhum arquivo carregado</div>',
                     unsafe_allow_html=True)
