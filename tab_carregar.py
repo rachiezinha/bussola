@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import io
-from utils.helpers import detectar_tipo, inferir_tipos, log_acao, OURO, MARROM
+from helpers import detectar_tipo, inferir_tipos, log_acao, OURO, MARROM
 
 
 def ler_arquivo(uploaded, separador=",", aba_excel=0):
