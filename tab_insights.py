@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from utils.helpers import log_acao, df_to_csv_bytes
+from helpers import log_acao, df_to_csv_bytes
 
 
 def _formatar_valor(v):
