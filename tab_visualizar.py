@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import io
-from utils.helpers import OURO, MARROM, NEUTRO, PLOTLY_TEMPLATE, log_acao
+from helpers import OURO, MARROM, NEUTRO, PLOTLY_TEMPLATE, log_acao
 
 
 def _df_ativo():
