@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from utils.helpers import log_acao, OURO, MARROM
+from helpers import log_acao, OURO, MARROM
 
 # Mapeamento de UFs para códigos IBGE (para choropleth)
 UF_PARA_SIGLA = {
