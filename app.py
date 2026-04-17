@@ -18,19 +18,17 @@ from helpers import inject_css, render_header
 inject_css()
 
 # ── Abas / módulos ────────────────────────────────────────────────────────────
-from tabs import (
-    tab_carregar,
-    tab_limpar,
-    tab_explorar,
-    tab_visualizar,
-    tab_mapas,
-    tab_texto,
-    tab_timeline,
-    tab_comparador,
-    tab_alertas,
-    tab_insights,
-    tab_meta,
-)
+import tab_carregar
+import tab_limpar
+import tab_explorar
+import tab_visualizar
+import tab_mapas
+import tab_texto
+import tab_timeline
+import tab_comparador
+import tab_alertas
+import tab_insights
+import tab_meta
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
