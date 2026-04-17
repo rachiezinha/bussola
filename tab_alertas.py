@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from utils.helpers import log_acao
+from helpers import log_acao
 
 
 def render():
