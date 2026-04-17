@@ -71,7 +71,7 @@ with st.sidebar:
     st.divider()
 
     # Status do arquivo carregado
-   if nome_arq:
+if nome_arq:
     st.markdown(f"""
     <div style="font-size:.78rem;color:#c4b49a">
         <b style="color:#bd8e27">Arquivo ativo:</b><br>
