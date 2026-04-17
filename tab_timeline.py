@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import re
-from utils.helpers import OURO, MARROM, log_acao
+from helpers import OURO, MARROM, log_acao
 
 
 def _extrair_datas_texto(texto):
