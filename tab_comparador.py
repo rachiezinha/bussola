@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import difflib
 import io
-from utils.helpers import log_acao
+from helpers import log_acao
 
 
 def _diff_texto(texto_a, texto_b):
