@@ -78,10 +78,11 @@ def _render_configurar_moeda(df: pd.DataFrame):
 
 def render():
     st.subheader("🔎 Explorar Dados")
-st.info(
-    "⚠️ **Atenção:** nem toda coluna deve ser somada. "
-    "Campos como médias, índices ou percentuais devem usar agregação por **Média**."
-)
+    st.info(
+        "⚠️ **Atenção:** nem toda coluna deve ser somada. "
+        "Campos como médias, índices ou percentuais devem usar agregação por **Média**."
+    )
+
     df_base = _df_ativo()
     if df_base is None:
         st.warning("⚠️ Carregue um arquivo na aba **Carregar Dados** primeiro.")
