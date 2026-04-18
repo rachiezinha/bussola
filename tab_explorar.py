@@ -1,15 +1,63 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from helpers import log_acao, df_to_csv_bytes, df_to_excel_bytes
-from moeda import (
-    colunas_moeda,
-    aplicar_formatacao_visual,
-    formatar_metrica,
-    MOEDAS_SUPORTADAS,
-)
 
-# ── Padrões de colunas que NÃO devem ser usadas como valor ───
+
+# ── Configuração de moedas ───────────────────────────────────────────────────
+MOEDAS_SUPORTADAS = ["BRL", "USD", "EUR", "GBP"]
+
+
+def formatar_moeda(valor, moeda="BRL"):
+    if pd.isna(valor):
+        return ""
+
+    try:
+        valor = float(valor)
+    except (TypeError, ValueError):
+        return str(valor)
+
+    if moeda == "BRL":
+        return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    if moeda == "USD":
+        return f"${valor:,.2f}"
+    if moeda == "EUR":
+        return f"€{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    if moeda == "GBP":
+        return f"£{valor:,.2f}"
+
+    return f"{valor:,.2f}"
+
+
+def formatar_numero_br(valor):
+    if pd.isna(valor):
+        return ""
+
+    try:
+        return f"{float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except (TypeError, ValueError):
+        return str(valor)
+
+
+def formatar_metrica(valor, coluna, formatos):
+    fmt = formatos.get(coluna, {})
+    if isinstance(fmt, dict) and fmt.get("tipo") == "moeda":
+        return formatar_moeda(valor, fmt.get("moeda", "BRL"))
+    return formatar_numero_br(valor)
+
+
+def aplicar_formatacao_visual(df, formatos):
+    df_vis = df.copy()
+
+    for col in df_vis.columns:
+        fmt = formatos.get(col, {})
+        if isinstance(fmt, dict) and fmt.get("tipo") == "moeda":
+            moeda = fmt.get("moeda", "BRL")
+            df_vis[col] = df_vis[col].apply(lambda v: formatar_moeda(v, moeda))
+
+    return df_vis
+
+
+# ── Padrões de colunas que NÃO devem ser usadas como valor ───────────────────
 _PADROES_EXCLUIR_VALOR = [
     "codigo", "cod_", "code", "id_", "_id", "ibge",
     "cep", "cpf", "cnpj", "fone", "telefone", "ddd", "zip", "postal",
@@ -33,14 +81,14 @@ def _eh_coluna_valor(col: str) -> bool:
 
 def _cols_num_valor(df: pd.DataFrame) -> list[str]:
     return [
-        c for c in df.select_dtypes("number").columns
+        c for c in df.select_dtypes("number").columns.tolist()
         if _eh_coluna_valor(c)
     ]
 
 
 def _render_configurar_moeda(df: pd.DataFrame):
     """Expander para marcar colunas numéricas como moeda."""
-    formatos: dict = st.session_state.setdefault("formatos_colunas", {})
+    formatos = st.session_state.setdefault("formatos_colunas", {})
     cols_num = df.select_dtypes("number").columns.tolist()
 
     with st.expander("💱 Configurar colunas de moeda", expanded=False):
@@ -52,7 +100,7 @@ def _render_configurar_moeda(df: pd.DataFrame):
 
         for col in cols_num:
             fmt_atual = formatos.get(col, {})
-            is_moeda  = isinstance(fmt_atual, dict) and fmt_atual.get("tipo") == "moeda"
+            is_moeda = isinstance(fmt_atual, dict) and fmt_atual.get("tipo") == "moeda"
             moeda_atual = fmt_atual.get("moeda", "BRL") if is_moeda else "BRL"
 
             c1, c2 = st.columns([3, 2])
@@ -69,7 +117,6 @@ def _render_configurar_moeda(df: pd.DataFrame):
                 formatos[col] = {"tipo": "moeda", "moeda": moeda_sel}
             else:
                 c2.empty()
-                # Remove formatação se desmarcado
                 if col in formatos and isinstance(formatos[col], dict) and formatos[col].get("tipo") == "moeda":
                     del formatos[col]
 
@@ -78,10 +125,9 @@ def _render_configurar_moeda(df: pd.DataFrame):
 
 def render():
     st.subheader("🔎 Explorar Dados")
-    st.info(
-        "⚠️ **Atenção:** nem toda coluna deve ser somada. "
-        "Campos como médias, índices ou percentuais devem usar agregação por **Média**."
-    )
+
+    if "formatos_colunas" not in st.session_state:
+        st.session_state["formatos_colunas"] = {}
 
     df_base = _df_ativo()
     if df_base is None:
@@ -90,24 +136,39 @@ def render():
 
     df = df_base.copy()
 
-    # ── Configuração de moeda ─────────────────────────────────────────────────
+    # ── Configuração de moeda ────────────────────────────────────────────────
     _render_configurar_moeda(df)
+    formatos = st.session_state.get("formatos_colunas", {})
 
-    formatos: dict = st.session_state.get("formatos_colunas", {})
-
-    # ── Filtros interativos ───────────────────────────────────────────────────
+    # ── Filtros interativos ──────────────────────────────────────────────────
     with st.expander("🔽 Filtros", expanded=True):
         colunas_filtro = st.multiselect("Filtrar por colunas", df.columns.tolist(), key="cols_filtro")
+
         for col in colunas_filtro:
             if pd.api.types.is_numeric_dtype(df[col]):
-                vmin, vmax = float(df[col].min()), float(df[col].max())
-                intervalo  = st.slider(f"{col}", vmin, vmax, (vmin, vmax), key=f"flt_{col}")
-                df = df[df[col].between(*intervalo)]
+                serie = df[col].dropna()
+                if serie.empty:
+                    continue
+
+                vmin = float(serie.min())
+                vmax = float(serie.max())
+
+                if vmin == vmax:
+                    st.caption(f"{col}: todos os valores são {formatar_numero_br(vmin)}")
+                else:
+                    intervalo = st.slider(
+                        f"{col}",
+                        min_value=vmin,
+                        max_value=vmax,
+                        value=(vmin, vmax),
+                        key=f"flt_{col}",
+                    )
+                    df = df[df[col].between(*intervalo)]
             else:
-                opts = sorted(df[col].dropna().unique().tolist())
-                sel  = st.multiselect(f"{col}", opts, key=f"flt_{col}")
+                opts = sorted(df[col].dropna().astype(str).unique().tolist())
+                sel = st.multiselect(f"{col}", opts, key=f"flt_{col}")
                 if sel:
-                    df = df[df[col].isin(sel)]
+                    df = df[df[col].astype(str).isin(sel)]
 
         busca = st.text_input("🔍 Busca textual (em todas as colunas de texto)", key="busca_global")
         if busca:
@@ -121,40 +182,54 @@ def render():
 
     st.divider()
 
-    # ── Estatísticas automáticas ──────────────────────────────────────────────
+    # ── Estatísticas automáticas ─────────────────────────────────────────────
     st.markdown("#### 📊 Estatísticas automáticas")
     cols_num = _cols_num_valor(df)
 
     if cols_num:
         col_stat = st.selectbox("Coluna numérica", cols_num, key="col_stat")
         s = df[col_stat].dropna()
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        c1.metric("Contagem", f"{len(s):,}".replace(",", "."))
-        c2.metric("Soma",     formatar_metrica(s.sum(),    col_stat, formatos))
-        c3.metric("Média",    formatar_metrica(s.mean(),   col_stat, formatos))
-        c4.metric("Mediana",  formatar_metrica(s.median(), col_stat, formatos))
-        c5.metric("Mín",      formatar_metrica(s.min(),    col_stat, formatos))
-        c6.metric("Máx",      formatar_metrica(s.max(),    col_stat, formatos))
+
+        if not s.empty:
+            c1, c2, c3, c4, c5, c6 = st.columns(6)
+            c1.metric("Contagem", f"{len(s):,}".replace(",", "."))
+            c2.metric("Soma", formatar_metrica(s.sum(), col_stat, formatos))
+            c3.metric("Média", formatar_metrica(s.mean(), col_stat, formatos))
+            c4.metric("Mediana", formatar_metrica(s.median(), col_stat, formatos))
+            c5.metric("Mín", formatar_metrica(s.min(), col_stat, formatos))
+            c6.metric("Máx", formatar_metrica(s.max(), col_stat, formatos))
 
     st.divider()
 
-    # ── Rankings ──────────────────────────────────────────────────────────────
+    # ── Rankings ─────────────────────────────────────────────────────────────
     st.markdown("#### 🏆 Rankings")
     cols_cat = df.select_dtypes(include=["object", "string"]).columns.tolist()
 
     if cols_cat and cols_num:
         rc1, rc2, rc3 = st.columns(3)
-        col_rank_cat = rc1.selectbox("Categoria (quem)",  cols_cat, key="rank_cat")
-        col_rank_val = rc2.selectbox("Valor (quanto)",    cols_num, key="rank_val")
-        n_rank       = rc3.selectbox("Top N", [5, 10, 20, 50], key="rank_n")
-        agg_func     = st.radio("Agregação", ["Soma", "Contagem", "Média"], horizontal=True, key="rank_agg")
+        col_rank_cat = rc1.selectbox("Categoria (quem)", cols_cat, key="rank_cat")
+        col_rank_val = rc2.selectbox("Valor (quanto)", cols_num, key="rank_val")
+        n_rank = rc3.selectbox("Top N", [5, 10, 20, 50], key="rank_n")
+        agg_func = st.radio("Agregação", ["Soma", "Contagem", "Média"], horizontal=True, key="rank_agg")
+
+        st.info(
+            "⚠️ Nem toda coluna deve ser somada. "
+            "Campos de média, índice ou percentual devem usar **Média**."
+        )
+
+        nome_col = col_rank_val.lower()
+        if any(p in nome_col for p in ["medio", "media", "avg", "percent", "perc", "indice", "index"]):
+            st.warning(
+                "⚠️ Esta coluna parece representar uma **média, índice ou percentual**. "
+                "Usar **Soma** pode gerar resultados incorretos."
+            )
 
         if agg_func == "Soma":
-            ranking = df.groupby(col_rank_cat)[col_rank_val].sum().nlargest(n_rank).reset_index()
+            ranking = df.groupby(col_rank_cat, dropna=False)[col_rank_val].sum().nlargest(n_rank).reset_index()
         elif agg_func == "Contagem":
-            ranking = df.groupby(col_rank_cat)[col_rank_val].count().nlargest(n_rank).reset_index()
+            ranking = df.groupby(col_rank_cat, dropna=False)[col_rank_val].count().nlargest(n_rank).reset_index()
         else:
-            ranking = df.groupby(col_rank_cat)[col_rank_val].mean().nlargest(n_rank).reset_index()
+            ranking = df.groupby(col_rank_cat, dropna=False)[col_rank_val].mean().nlargest(n_rank).reset_index()
 
         ranking_vis = ranking.copy()
         ranking_vis.columns = ["Categoria", "Valor"]
@@ -162,23 +237,24 @@ def render():
             lambda v: formatar_metrica(v, col_rank_val, formatos)
         )
         ranking_vis.index = range(1, len(ranking_vis) + 1)
+
         st.dataframe(ranking_vis, use_container_width=True)
         log_acao(f"Ranking gerado: top {n_rank} de '{col_rank_cat}' por {agg_func} de '{col_rank_val}'")
 
     st.divider()
 
-    # ── Distribuição por categoria ────────────────────────────────────────────
+    # ── Distribuição por categoria ───────────────────────────────────────────
     st.markdown("#### 📂 Distribuição por categoria")
     if cols_cat:
         col_dist = st.selectbox("Coluna categórica", cols_cat, key="col_dist")
-        dist = df[col_dist].value_counts().reset_index()
+        dist = df[col_dist].value_counts(dropna=False).reset_index()
         dist.columns = ["Valor", "Contagem"]
         dist["% do total"] = (dist["Contagem"] / len(df) * 100).round(1).astype(str) + "%"
         st.dataframe(dist.head(30), use_container_width=True, hide_index=True)
 
     st.divider()
 
-    # ── Análise temporal ──────────────────────────────────────────────────────
+    # ── Análise temporal ─────────────────────────────────────────────────────
     cols_data = [
         c for c in df.columns
         if pd.api.types.is_datetime64_any_dtype(df[c])
@@ -189,8 +265,9 @@ def render():
         st.markdown("#### 📅 Análise temporal")
         col_data = st.selectbox("Coluna de data", cols_data, key="col_data_exp")
         try:
-            df[col_data] = pd.to_datetime(df[col_data], dayfirst=True, errors="coerce")
-            df_t = df.dropna(subset=[col_data]).copy()
+            df_temp = df.copy()
+            df_temp[col_data] = pd.to_datetime(df_temp[col_data], dayfirst=True, errors="coerce")
+            df_t = df_temp.dropna(subset=[col_data]).copy()
             df_t["ano"] = df_t[col_data].dt.year
             contagem_ano = df_t.groupby("ano").size().reset_index(name="Contagem")
             st.bar_chart(contagem_ano.set_index("ano"))
@@ -199,16 +276,13 @@ def render():
 
     st.divider()
 
-    # ── Cruzamento simples ────────────────────────────────────────────────────
+    # ── Cruzamento simples ───────────────────────────────────────────────────
     st.markdown("#### ✖️ Cruzamento entre variáveis")
     if cols_cat:
         cr1, cr2 = st.columns(2)
         col_cruzA = cr1.selectbox("Variável A (linhas)", cols_cat, key="cruzA")
-        col_cruzB = cr2.selectbox(
-            "Variável B (colunas)",
-            cols_cat if len(cols_cat) > 1 else cols_num,
-            key="cruzB",
-        )
+        opcoes_cruz_b = cols_cat if len(cols_cat) > 1 else cols_num
+        col_cruzB = cr2.selectbox("Variável B (colunas)", opcoes_cruz_b, key="cruzB")
 
         if col_cruzA != col_cruzB:
             pivot = pd.crosstab(df[col_cruzA], df[col_cruzB])
@@ -218,7 +292,7 @@ def render():
 
     st.divider()
 
-    # ── Exportar resultado filtrado ───────────────────────────────────────────
+    # ── Exportar resultado filtrado ──────────────────────────────────────────
     st.markdown("#### 💾 Exportar resultado filtrado")
     c1, c2 = st.columns(2)
     with c1:
