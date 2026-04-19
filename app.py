@@ -25,8 +25,6 @@ import tab_visualizar
 import tab_mapas
 import tab_texto
 import tab_comparador
-import tab_alertas
-import tab_insights
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -51,8 +49,6 @@ with st.sidebar:
         "🗺️  Mapas":               "mapas",
         "📄 Extrair de Texto":      "texto",
         "🔄 Comparador de Versões": "comparador",
-        "⚠️  Inconsistências":      "alertas",
-        "💡 Insights de Pauta":     "insights",
     }
 
     secao_atual = st.radio(
@@ -122,11 +118,5 @@ elif chave == "mapas":
     tab_mapas.render()
 elif chave == "texto":
     tab_texto.render()
-elif chave == "timeline":
-    tab_timeline.render()
 elif chave == "comparador":
     tab_comparador.render()
-elif chave == "alertas":
-    tab_alertas.render()
-elif chave == "insights":
-    tab_insights.render()
