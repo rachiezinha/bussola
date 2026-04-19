@@ -65,32 +65,20 @@ def render():
 
     df = df.copy()
 
-    st.markdown("Visualize seus dados no mapa por **estado (UF)**.")
-
     cols_num = df.select_dtypes("number").columns.tolist()
     cols_cat = df.select_dtypes("object").columns.tolist()
 
-    if not cols_num:
-        st.warning("A base não possui colunas numéricas para gerar mapas.")
-        return
-
-    if not cols_cat:
-        st.warning("A base não possui colunas de texto para identificar UF/estado.")
+    if not cols_num or not cols_cat:
+        st.warning("Dataset precisa de colunas numéricas e categóricas.")
         return
 
     col_uf_auto = _detectar_col_uf(df)
     idx_uf = cols_cat.index(col_uf_auto) if col_uf_auto in cols_cat else 0
 
-    modo = st.radio(
-        "Modo de mapa",
-        ["Por Estado (UF)", "Choropleth"],
-        horizontal=True,
-    )
+    modo = st.radio("Modo de mapa", ["Por Estado (UF)", "Choropleth"], horizontal=True)
 
-    # 🫧 MAPA DE BOLHAS
+    # 🫧 MAPA DE BOLHAS (AGORA BONITO)
     if modo == "Por Estado (UF)":
-        st.caption("🫧 Bolhas proporcionais ao valor por estado.")
-
         col_uf = st.selectbox("Coluna de UF", cols_cat, index=idx_uf)
         col_val = st.selectbox("Valor", cols_num)
         agg = st.radio("Agregação", ["Soma", "Contagem", "Média"], horizontal=True)
@@ -98,50 +86,63 @@ def render():
         df["UF"] = _normalizar_uf(df[col_uf])
 
         if agg == "Soma":
-            grp = df.groupby("UF", dropna=False)[col_val].sum().reset_index()
+            grp = df.groupby("UF")[col_val].sum().reset_index()
         elif agg == "Contagem":
-            grp = df.groupby("UF", dropna=False)[col_val].count().reset_index()
+            grp = df.groupby("UF")[col_val].count().reset_index()
         else:
-            grp = df.groupby("UF", dropna=False)[col_val].mean().reset_index()
+            grp = df.groupby("UF")[col_val].mean().reset_index()
 
         grp.columns = ["UF", "Valor"]
         grp["lat"] = grp["UF"].map(lambda u: COORDS_UF.get(u, (None, None))[0])
         grp["lon"] = grp["UF"].map(lambda u: COORDS_UF.get(u, (None, None))[1])
-        grp = grp.dropna(subset=["lat", "lon", "Valor"])
+        grp = grp.dropna()
 
-        if grp.empty:
-            st.warning("Não foi possível identificar UFs válidas para plotar o mapa.")
-            return
+        import requests
+        geojson = requests.get(_GEOJSON_URL, timeout=10).json()
 
-        fig = px.scatter_geo(
+        fig = px.choropleth(
             grp,
-            lat="lat",
-            lon="lon",
-            size="Valor",
-            color="Valor",
-            hover_name="UF",
-            hover_data={"Valor": True, "lat": False, "lon": False},
-            scope="south america",
-            color_continuous_scale=["#f0ead8", OURO, MARROM],
+            geojson=geojson,
+            locations="UF",
+            featureidkey="properties.sigla",
         )
 
+        fig.update_traces(
+            marker_line_color="#2a2a2a",
+            marker_line_width=0.6,
+            marker_opacity=0
+        )
+
+        tamanho = (grp["Valor"] / grp["Valor"].max()) * 35 + 5
+
+        fig.add_scattergeo(
+            lon=grp["lon"],
+            lat=grp["lat"],
+            mode="markers",
+            marker=dict(
+                size=tamanho,
+                color=grp["Valor"],
+                colorscale=["#f0ead8", OURO, MARROM],
+                showscale=True,
+                opacity=0.85,
+                line=dict(width=0.8, color="#111")
+            ),
+            text=grp["UF"] + "<br>" + grp["Valor"].astype(str),
+            hoverinfo="text"
+        )
+
+        fig.update_geos(fitbounds="locations", visible=False)
+
         st.plotly_chart(fig, use_container_width=True)
-        log_acao("Mapa bolhas")
+        log_acao("Mapa bolhas bonito")
 
     # 🗺️ CHOROPLETH
     else:
-        st.caption("🗺️ Estados coloridos por valor.")
-
         col_uf = st.selectbox("Coluna de UF", cols_cat, index=idx_uf)
         col_val = st.selectbox("Valor", cols_num)
 
         df["UF"] = _normalizar_uf(df[col_uf])
-        grp = df.groupby("UF", dropna=False)[col_val].sum().reset_index()
-        grp = grp.dropna(subset=[col_val])
-
-        if grp.empty:
-            st.warning("Não há dados suficientes para montar o choropleth.")
-            return
+        grp = df.groupby("UF")[col_val].sum().reset_index()
 
         import requests
         geojson = requests.get(_GEOJSON_URL, timeout=10).json()
@@ -156,10 +157,7 @@ def render():
             color_continuous_scale=["#f0ead8", OURO, MARROM],
         )
 
-        fig.update_geos(
-            fitbounds="locations",
-            visible=False
-        )
+        fig.update_geos(fitbounds="locations", visible=False)
 
         coords_labels = pd.DataFrame(
             [{"UF": uf, "lat": lat, "lon": lon} for uf, (lat, lon) in COORDS_UF.items()]
