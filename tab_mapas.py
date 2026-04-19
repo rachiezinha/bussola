@@ -77,8 +77,12 @@ def render():
 
     modo = st.radio("Modo de mapa", ["Por Estado (UF)", "Choropleth"], horizontal=True)
 
-    # 🫧 MAPA DE BOLHAS (AGORA BONITO)
+    import requests
+    geojson = requests.get(_GEOJSON_URL, timeout=10).json()
+
     if modo == "Por Estado (UF)":
+        st.caption("🫧 Bolhas proporcionais ao valor por estado.")
+
         col_uf = st.selectbox("Coluna de UF", cols_cat, index=idx_uf)
         col_val = st.selectbox("Valor", cols_num)
         agg = st.radio("Agregação", ["Soma", "Contagem", "Média"], horizontal=True)
@@ -86,34 +90,43 @@ def render():
         df["UF"] = _normalizar_uf(df[col_uf])
 
         if agg == "Soma":
-            grp = df.groupby("UF")[col_val].sum().reset_index()
+            grp = df.groupby("UF", dropna=False)[col_val].sum().reset_index()
         elif agg == "Contagem":
-            grp = df.groupby("UF")[col_val].count().reset_index()
+            grp = df.groupby("UF", dropna=False)[col_val].count().reset_index()
         else:
-            grp = df.groupby("UF")[col_val].mean().reset_index()
+            grp = df.groupby("UF", dropna=False)[col_val].mean().reset_index()
 
         grp.columns = ["UF", "Valor"]
         grp["lat"] = grp["UF"].map(lambda u: COORDS_UF.get(u, (None, None))[0])
         grp["lon"] = grp["UF"].map(lambda u: COORDS_UF.get(u, (None, None))[1])
-        grp = grp.dropna()
+        grp = grp.dropna(subset=["lat", "lon", "Valor"])
 
-        import requests
-        geojson = requests.get(_GEOJSON_URL, timeout=10).json()
+        if grp.empty:
+            st.warning("Não foi possível identificar UFs válidas para plotar o mapa.")
+            return
+
+        # mapa base com divisão dos estados
+        base = pd.DataFrame({"UF": list(COORDS_UF.keys()), "base": [1] * len(COORDS_UF)})
 
         fig = px.choropleth(
-            grp,
+            base,
             geojson=geojson,
             locations="UF",
             featureidkey="properties.sigla",
+            color="base",
+            scope="south america",
+            color_continuous_scale=["#f5f5f5", "#f5f5f5"],
         )
 
         fig.update_traces(
-            marker_line_color="#2a2a2a",
-            marker_line_width=0.6,
-            marker_opacity=0
+            marker_line_color="#3a3a3a",
+            marker_line_width=0.7,
+            marker_opacity=0.18,
+            hoverinfo="skip",
+            showscale=False,
         )
 
-        tamanho = (grp["Valor"] / grp["Valor"].max()) * 35 + 5
+        tamanho = (grp["Valor"] / grp["Valor"].max()) * 35 + 6
 
         fig.add_scattergeo(
             lon=grp["lon"],
@@ -124,28 +137,46 @@ def render():
                 color=grp["Valor"],
                 colorscale=["#f0ead8", OURO, MARROM],
                 showscale=True,
-                opacity=0.85,
-                line=dict(width=0.8, color="#111")
+                colorbar=dict(title="Valor"),
+                opacity=0.88,
+                line=dict(width=0.8, color="#111"),
             ),
-            text=grp["UF"] + "<br>" + grp["Valor"].astype(str),
-            hoverinfo="text"
+            text=grp["UF"] + "<br>" + grp["Valor"].map(lambda x: f"{x:,.0f}".replace(",", ".")),
+            hoverinfo="text",
         )
 
-        fig.update_geos(fitbounds="locations", visible=False)
+        fig.update_geos(
+            fitbounds="locations",
+            visible=False,
+            bgcolor="rgba(0,0,0,0)",
+            showland=True,
+            landcolor="#f5f5f5",
+            showcountries=False,
+            showcoastlines=False,
+            showframe=False,
+        )
+
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=0, t=10, b=0),
+        )
 
         st.plotly_chart(fig, use_container_width=True)
         log_acao("Mapa bolhas bonito")
 
-    # 🗺️ CHOROPLETH
     else:
+        st.caption("🗺️ Estados coloridos por valor.")
+
         col_uf = st.selectbox("Coluna de UF", cols_cat, index=idx_uf)
         col_val = st.selectbox("Valor", cols_num)
 
         df["UF"] = _normalizar_uf(df[col_uf])
-        grp = df.groupby("UF")[col_val].sum().reset_index()
+        grp = df.groupby("UF", dropna=False)[col_val].sum().reset_index()
+        grp = grp.dropna(subset=[col_val])
 
-        import requests
-        geojson = requests.get(_GEOJSON_URL, timeout=10).json()
+        if grp.empty:
+            st.warning("Não há dados suficientes para montar o choropleth.")
+            return
 
         fig = px.choropleth(
             grp,
@@ -170,7 +201,7 @@ def render():
             mode="text",
             textfont=dict(size=10, color="black"),
             showlegend=False,
-            hoverinfo="skip"
+            hoverinfo="skip",
         )
 
         st.plotly_chart(fig, use_container_width=True)
