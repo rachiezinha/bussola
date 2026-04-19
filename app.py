@@ -24,7 +24,6 @@ import tab_explorar
 import tab_visualizar
 import tab_mapas
 import tab_texto
-import tab_timeline
 import tab_comparador
 import tab_alertas
 import tab_insights
@@ -51,7 +50,6 @@ with st.sidebar:
         "📈 Visualizar":            "visualizar",
         "🗺️  Mapas":               "mapas",
         "📄 Extrair de Texto":      "texto",
-        "📅 Linha do Tempo":        "timeline",
         "🔄 Comparador de Versões": "comparador",
         "⚠️  Inconsistências":      "alertas",
         "💡 Insights de Pauta":     "insights",
