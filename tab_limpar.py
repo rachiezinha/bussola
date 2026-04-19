@@ -248,90 +248,71 @@ def render():
             st.success("✅  Concluído.")
             st.rerun()
 
-    # ── Converter tipos ───────────────────────────────────────────────────────
-    with st.expander("🔄  Converter tipo de coluna"):
-        col_conv = st.selectbox("Coluna", df.columns, key="col_conv")
+   # ── Converter tipos ───────────────────────────────────────────────────────
+with st.expander("🔄  Corrigir tipo da coluna"):
+    col_conv = st.selectbox("Coluna", df.columns, key="col_conv")
 
-        tipo_alvo = st.selectbox(
-            "Converter para",
-            [
-                "Número (float)",
-                "Número inteiro",
-                "Texto",
-                "Data",
-                "Moeda/texto → número",
-                "Número → moeda",
-                "Moeda → moeda",
-            ],
-            key="tipo_alvo"
+    tipo_alvo = st.selectbox(
+        "Converter para",
+        [
+            "Número (float)",
+            "Número inteiro",
+            "Texto",
+            "Data",
+            "Moeda/texto → número",
+        ],
+        key="tipo_alvo"
+    )
+
+    formato_detectado = detectar_formato_moeda(df[col_conv])
+
+    if formato_detectado != "NUMERO":
+        st.info(f"Formato detectado automaticamente: {formato_detectado}")
+    else:
+        st.caption("Formato detectado: número puro / sem moeda explícita")
+
+    moeda_origem = None
+
+    if tipo_alvo == "Moeda/texto → número":
+        moedas_lista = list(MOEDAS.keys())
+        indice_origem = moedas_lista.index(formato_detectado) if formato_detectado in moedas_lista else 0
+        moeda_origem = st.selectbox(
+            "Moeda de origem",
+            moedas_lista,
+            index=indice_origem,
+            key="moeda_origem_conv"
         )
 
-        formato_detectado = detectar_formato_moeda(df[col_conv])
+    st.caption(f"Tipo atual: `{df[col_conv].dtype}`")
 
-        if formato_detectado != "NUMERO":
-            st.info(f"Formato detectado automaticamente: {formato_detectado}")
-        else:
-            st.caption("Formato detectado: número puro / sem moeda explícita")
+    if st.button("Converter", key="btn_conv"):
+        try:
+            tipo_antes = str(df[col_conv].dtype)
 
-        moeda_origem = None
-        moeda_destino = None
+            if tipo_alvo == "Número (float)":
+                df[col_conv] = normalizar_para_numero_generico(df[col_conv])
 
-        if tipo_alvo in ["Moeda/texto → número", "Moeda → moeda"]:
-            moedas_lista = list(MOEDAS.keys())
-            indice_origem = moedas_lista.index(formato_detectado) if formato_detectado in moedas_lista else 0
-            moeda_origem = st.selectbox(
-                "Moeda de origem",
-                moedas_lista,
-                index=indice_origem,
-                key="moeda_origem_conv"
-            )
+            elif tipo_alvo == "Número inteiro":
+                df[col_conv] = normalizar_para_numero_generico(df[col_conv]).astype("Int64")
 
-        if tipo_alvo in ["Número → moeda", "Moeda → moeda"]:
-            moeda_destino = st.selectbox(
-                "Moeda de destino",
-                list(MOEDAS.keys()),
-                index=0,
-                key="moeda_destino_conv"
-            )
+            elif tipo_alvo == "Texto":
+                df[col_conv] = df[col_conv].astype(str)
 
-        st.caption(f"Tipo atual: `{df[col_conv].dtype}`")
+            elif tipo_alvo == "Data":
+                df[col_conv] = pd.to_datetime(df[col_conv], dayfirst=True, errors="coerce")
 
-        if st.button("Converter", key="btn_conv"):
-            try:
-                tipo_antes = str(df[col_conv].dtype)
+            elif tipo_alvo == "Moeda/texto → número":
+                df[col_conv] = moeda_texto_para_numero(df[col_conv], moeda=moeda_origem)
 
-                if tipo_alvo == "Número (float)":
-                    df[col_conv] = normalizar_para_numero_generico(df[col_conv])
+            st.session_state["df_limpo"] = df
+            tipo_depois = str(df[col_conv].dtype)
 
-                elif tipo_alvo == "Número inteiro":
-                    df[col_conv] = normalizar_para_numero_generico(df[col_conv]).astype("Int64")
+            log_acao(f"Coluna '{col_conv}' convertida para {tipo_alvo}")
+            st.success(f"✅ Conversão feita! Tipo: {tipo_antes} → {tipo_depois}")
+            st.rerun()
 
-                elif tipo_alvo == "Texto":
-                    df[col_conv] = df[col_conv].astype(str)
-
-                elif tipo_alvo == "Data":
-                    df[col_conv] = pd.to_datetime(df[col_conv], dayfirst=True, errors="coerce")
-
-                elif tipo_alvo == "Moeda/texto → número":
-                    df[col_conv] = moeda_texto_para_numero(df[col_conv], moeda=moeda_origem)
-
-                elif tipo_alvo == "Número → moeda":
-                    numeros = normalizar_para_numero_generico(df[col_conv])
-                    df[col_conv] = numeros.apply(lambda x: numero_para_moeda(x, moeda_destino))
-
-                elif tipo_alvo == "Moeda → moeda":
-                    numeros = moeda_texto_para_numero(df[col_conv], moeda=moeda_origem)
-                    df[col_conv] = numeros.apply(lambda x: numero_para_moeda(x, moeda_destino))
-
-                st.session_state["df_limpo"] = df
-                tipo_depois = str(df[col_conv].dtype)
-
-                log_acao(f"Coluna '{col_conv}' convertida para {tipo_alvo}")
-                st.success(f"✅ Conversão feita! Tipo: {tipo_antes} → {tipo_depois}")
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"Erro: {e}")
+        except Exception as e:
+            st.error(f"Erro: {e}")
 
     # ── Padronizar texto ──────────────────────────────────────────────────────
     with st.expander("🔡  Padronizar texto"):
