@@ -28,7 +28,6 @@ import tab_timeline
 import tab_comparador
 import tab_alertas
 import tab_insights
-import tab_meta
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -56,8 +55,6 @@ with st.sidebar:
         "🔄 Comparador de Versões": "comparador",
         "⚠️  Inconsistências":      "alertas",
         "💡 Insights de Pauta":     "insights",
-        "📋 Metodologia":           "metodologia",
-        "📓 Bloco de Notas":        "notas",
     }
 
     secao_atual = st.radio(
@@ -99,6 +96,7 @@ with st.sidebar:
             Texto: {len(txt_sessao):,} caracteres
             </div>
             """.replace(",", "."), unsafe_allow_html=True)
+
     else:
         st.markdown(
             '<div style="font-size:.78rem;color:#a09890">Nenhum arquivo carregado</div>',
@@ -134,7 +132,3 @@ elif chave == "alertas":
     tab_alertas.render()
 elif chave == "insights":
     tab_insights.render()
-elif chave == "metodologia":
-    tab_meta.render_metodologia()
-elif chave == "notas":
-    tab_meta.render_notas()
