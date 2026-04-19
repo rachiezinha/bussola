@@ -16,13 +16,13 @@ UF_PARA_SIGLA = {
 
 # Coordenadas por UF
 COORDS_UF = {
-    "AC": (-9.0, -70.8), "AL": (-9.6, -36.8), "AP": (1.4, -52.0),  "AM": (-3.4, -65.0),
-    "BA": (-12.9,-41.7), "CE": (-5.2, -39.5), "DF": (-15.8,-47.8), "ES": (-19.9,-40.5),
-    "GO": (-15.8,-49.8), "MA": (-5.1, -45.3), "MT": (-12.7,-51.9), "MS": (-20.7,-54.8),
-    "MG": (-18.5,-44.6), "PA": (-3.9, -52.2), "PB": (-7.2, -36.8), "PR": (-24.9,-51.5),
-    "PE": (-8.3, -37.9), "PI": (-7.7, -42.7), "RJ": (-22.3,-43.2), "RN": (-5.8, -36.6),
-    "RS": (-30.0,-53.2), "RO": (-10.9,-62.0), "RR": (1.9,  -61.2), "SC": (-27.4,-50.7),
-    "SP": (-22.3,-48.7), "SE": (-10.6,-37.4), "TO": (-10.2,-48.3),
+    "AC": (-9.0, -70.8), "AL": (-9.6, -36.8), "AP": (1.4, -52.0), "AM": (-3.4, -65.0),
+    "BA": (-12.9, -41.7), "CE": (-5.2, -39.5), "DF": (-15.8, -47.8), "ES": (-19.9, -40.5),
+    "GO": (-15.8, -49.8), "MA": (-5.1, -45.3), "MT": (-12.7, -51.9), "MS": (-20.7, -54.8),
+    "MG": (-18.5, -44.6), "PA": (-3.9, -52.2), "PB": (-7.2, -36.8), "PR": (-24.9, -51.5),
+    "PE": (-8.3, -37.9), "PI": (-7.7, -42.7), "RJ": (-22.3, -43.2), "RN": (-5.8, -36.6),
+    "RS": (-30.0, -53.2), "RO": (-10.9, -62.0), "RR": (1.9, -61.2), "SC": (-27.4, -50.7),
+    "SP": (-22.3, -48.7), "SE": (-10.6, -37.4), "TO": (-10.2, -48.3),
 }
 
 _GEOJSON_URL = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson"
@@ -55,8 +55,11 @@ def render():
 | **Choropleth** | Comparar estados com base em cor (ranking) |
         """)
 
-    df = st.session_state.get("df_limpo") or st.session_state.get("df")
+    df = st.session_state.get("df_limpo")
     if df is None:
+        df = st.session_state.get("df")
+
+    if df is None or df.empty:
         st.warning("Carregue um dataset primeiro.")
         return
 
@@ -66,6 +69,14 @@ def render():
 
     cols_num = df.select_dtypes("number").columns.tolist()
     cols_cat = df.select_dtypes("object").columns.tolist()
+
+    if not cols_num:
+        st.warning("A base não possui colunas numéricas para gerar mapas.")
+        return
+
+    if not cols_cat:
+        st.warning("A base não possui colunas de texto para identificar UF/estado.")
+        return
 
     modo = st.radio(
         "Modo de mapa",
@@ -77,22 +88,30 @@ def render():
     if modo == "Por Estado (UF)":
         st.caption("🫧 Bolhas proporcionais ao valor por estado.")
 
-        col_uf = st.selectbox("Coluna de UF", cols_cat)
+        col_uf_auto = _detectar_col_uf(df)
+        idx_uf = cols_cat.index(col_uf_auto) if col_uf_auto in cols_cat else 0
+
+        col_uf = st.selectbox("Coluna de UF", cols_cat, index=idx_uf)
         col_val = st.selectbox("Valor", cols_num)
         agg = st.radio("Agregação", ["Soma", "Contagem", "Média"], horizontal=True)
 
         df["UF"] = _normalizar_uf(df[col_uf])
 
         if agg == "Soma":
-            grp = df.groupby("UF")[col_val].sum().reset_index()
+            grp = df.groupby("UF", dropna=False)[col_val].sum().reset_index()
         elif agg == "Contagem":
-            grp = df.groupby("UF")[col_val].count().reset_index()
+            grp = df.groupby("UF", dropna=False)[col_val].count().reset_index()
         else:
-            grp = df.groupby("UF")[col_val].mean().reset_index()
+            grp = df.groupby("UF", dropna=False)[col_val].mean().reset_index()
 
         grp.columns = ["UF", "Valor"]
         grp["lat"] = grp["UF"].map(lambda u: COORDS_UF.get(u, (None, None))[0])
         grp["lon"] = grp["UF"].map(lambda u: COORDS_UF.get(u, (None, None))[1])
+        grp = grp.dropna(subset=["lat", "lon", "Valor"])
+
+        if grp.empty:
+            st.warning("Não foi possível identificar UFs válidas para plotar o mapa.")
+            return
 
         fig = px.scatter_geo(
             grp,
@@ -100,6 +119,8 @@ def render():
             lon="lon",
             size="Valor",
             color="Valor",
+            hover_name="UF",
+            hover_data={"Valor": True, "lat": False, "lon": False},
             scope="south america",
             color_continuous_scale=["#f0ead8", OURO, MARROM],
         )
@@ -111,14 +132,22 @@ def render():
     else:
         st.caption("🗺️ Estados coloridos por valor.")
 
-        col_uf = st.selectbox("Coluna de UF", cols_cat)
+        col_uf_auto = _detectar_col_uf(df)
+        idx_uf = cols_cat.index(col_uf_auto) if col_uf_auto in cols_cat else 0
+
+        col_uf = st.selectbox("Coluna de UF", cols_cat, index=idx_uf)
         col_val = st.selectbox("Valor", cols_num)
 
         df["UF"] = _normalizar_uf(df[col_uf])
-        grp = df.groupby("UF")[col_val].sum().reset_index()
+        grp = df.groupby("UF", dropna=False)[col_val].sum().reset_index()
+        grp = grp.dropna(subset=[col_val])
+
+        if grp.empty:
+            st.warning("Não há dados suficientes para montar o choropleth.")
+            return
 
         import requests
-        geojson = requests.get(_GEOJSON_URL).json()
+        geojson = requests.get(_GEOJSON_URL, timeout=10).json()
 
         fig = px.choropleth(
             grp,
