@@ -78,6 +78,9 @@ def render():
         st.warning("A base não possui colunas de texto para identificar UF/estado.")
         return
 
+    col_uf_auto = _detectar_col_uf(df)
+    idx_uf = cols_cat.index(col_uf_auto) if col_uf_auto in cols_cat else 0
+
     modo = st.radio(
         "Modo de mapa",
         ["Por Estado (UF)", "Choropleth"],
@@ -87,9 +90,6 @@ def render():
     # 🫧 MAPA DE BOLHAS
     if modo == "Por Estado (UF)":
         st.caption("🫧 Bolhas proporcionais ao valor por estado.")
-
-        col_uf_auto = _detectar_col_uf(df)
-        idx_uf = cols_cat.index(col_uf_auto) if col_uf_auto in cols_cat else 0
 
         col_uf = st.selectbox("Coluna de UF", cols_cat, index=idx_uf)
         col_val = st.selectbox("Valor", cols_num)
@@ -132,9 +132,6 @@ def render():
     else:
         st.caption("🗺️ Estados coloridos por valor.")
 
-        col_uf_auto = _detectar_col_uf(df)
-        idx_uf = cols_cat.index(col_uf_auto) if col_uf_auto in cols_cat else 0
-
         col_uf = st.selectbox("Coluna de UF", cols_cat, index=idx_uf)
         col_val = st.selectbox("Valor", cols_num)
 
@@ -159,7 +156,24 @@ def render():
             color_continuous_scale=["#f0ead8", OURO, MARROM],
         )
 
-        fig.update_geos(fitbounds="locations", visible=False)
+        fig.update_geos(
+            fitbounds="locations",
+            visible=False
+        )
+
+        coords_labels = pd.DataFrame(
+            [{"UF": uf, "lat": lat, "lon": lon} for uf, (lat, lon) in COORDS_UF.items()]
+        )
+
+        fig.add_scattergeo(
+            lon=coords_labels["lon"],
+            lat=coords_labels["lat"],
+            text=coords_labels["UF"],
+            mode="text",
+            textfont=dict(size=10, color="black"),
+            showlegend=False,
+            hoverinfo="skip"
+        )
 
         st.plotly_chart(fig, use_container_width=True)
         log_acao("Choropleth")
