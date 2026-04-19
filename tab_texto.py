@@ -127,7 +127,7 @@ def render():
             st.dataframe(df_freq, use_container_width=True, hide_index=True)
         with col_f2:
             import plotly.express as px
-            from utils.helpers import OURO, MARROM
+            from helpers import OURO, MARROM
             fig = px.bar(df_freq.head(20), x="Frequência", y="Termo", orientation="h",
                          color_discrete_sequence=[OURO])
             fig.update_traces(marker_color=OURO)
